@@ -5,18 +5,18 @@
 /outputs/
 
 # Ignore specific avatar folders
-/visualize/vis/avatars/splats_1_1/
-/visualize/vis/avatars/splats_1_2/
-/visualize/vis/avatars/splats_8_1/
-/visualize/vis/avatars/splats_8_2/
-/visualize/vis/avatars/splats_8_10/
+/visualization/vis/avatars/splats_1_1/
+/visualization/vis/avatars/splats_1_2/
+/visualization/vis/avatars/splats_8_1/
+/visualization/vis/avatars/splats_8_2/
+/visualization/vis/avatars/splats_8_10/
 
 # Ignore data folder content
 /avatar/data/Custom/data/
 
 # Ignore package.json and package-lock.json inside visualize
-/visualize/package.json
-/visualize/package-lock.json
+/visualization/package.json
+/visualization/package-lock.json
 /fitting/MODELS_DIR
 /avatar/output
 /avatar/tools/diff-gaussian-rasterization-depth
