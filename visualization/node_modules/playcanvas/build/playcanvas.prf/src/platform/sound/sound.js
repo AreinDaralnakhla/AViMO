@@ -1,0 +1,20 @@
+class Sound {
+		constructor(resource){
+				if (resource instanceof Audio) {
+						this.audio = resource;
+				} else {
+						this.buffer = resource;
+				}
+		}
+		get duration() {
+				let duration = 0;
+				if (this.buffer) {
+						duration = this.buffer.duration;
+				} else if (this.audio) {
+						duration = this.audio.duration;
+				}
+				return duration || 0;
+		}
+}
+
+export { Sound };

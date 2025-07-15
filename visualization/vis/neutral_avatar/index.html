@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Neutral Avatar Viewer</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #slider {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+    }
+    #avimo-text {
+      position: absolute;
+      bottom: 100px;
+      left: 100px;
+      font-size: 24px;
+      z-index:100;
+      font-family: Arial, sans-serif;
+      color: rgba(21, 236, 172, 0.5); /* Semi-transparent black */
+      z-index: 10; /* Ensure it appears above the canvas */
+    }
+  </style>
+</head>
+<body>
+  <input type="range" id="slider" min="0" max="1" step="0.01" value="0.5">
+  <div id="avimo-text">AVIMO</div>
+  <script type="importmap">
+    {
+      "imports": {
+        "@sparkjsdev/spark": "/dist/spark.module.js"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { SplatMesh } from "@sparkjsdev/spark";
+  
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000); // Set background to white
+  
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 3);
+  
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+  
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableZoom = false;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 1.0;
+  
+    let mesh1, mesh2;
+  
+    // Load model1 as SplatMesh
+    mesh1 = new SplatMesh({ url: 'me1.ply' });
+    mesh1.initialized.then(() => {
+      mesh1.opacity = 1.0;
+      scene.add(mesh1);
+    });
+  
+    // Load model2 as SplatMesh
+    mesh2 = new SplatMesh({ url: 'me2_face.ply' });
+    mesh2.initialized.then(() => {
+      mesh2.opacity = 0.0;
+      mesh2.rotation.x = Math.PI;
+      scene.add(mesh2);
+    });
+  
+    // Slider blending
+    document.getElementById('slider').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      if (mesh1) mesh1.opacity = 1.0 - val;
+      if (mesh2) mesh2.opacity = val;
+    });
+  
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      // Increase rotation speed
+      if (mesh1) mesh1.rotation.y += 0.05; // Faster rotation
+      if (mesh2) mesh2.rotation.y += -0.05; // Faster rotation
+      renderer.render(scene, camera);
+    }
+    animate();
+  
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

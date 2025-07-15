@@ -1,0 +1,26 @@
+/**
+ * Utility static class providing functionality to pack float values to various storage
+ * representations.
+ *
+ * @category Math
+ */
+export class FloatPacking {
+    /**
+     * Packs a float to a 16-bit half-float representation used by the GPU.
+     *
+     * @param {number} value - The float value to pack.
+     * @returns {number} The packed value.
+     */
+    static float2Half(value: number): number;
+    /**
+     * Converts bits of a 32-bit float into RGBA8 format and stores the result in a provided color.
+     * The float can be reconstructed in shader using the uintBitsToFloat instruction.
+     *
+     * @param {number} value - The float value to convert.
+     * @param {Color} data - The color to store the RGBA8 packed value in.
+     *
+     * @ignore
+     */
+    static float2RGBA8(value: number, data: Color): void;
+}
+import type { Color } from './color.js';

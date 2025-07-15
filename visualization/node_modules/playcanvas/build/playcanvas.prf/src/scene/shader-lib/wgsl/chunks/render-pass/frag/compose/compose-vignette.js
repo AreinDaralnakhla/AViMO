@@ -1,0 +1,23 @@
+var composeVignettePS = `
+	#ifdef VIGNETTE
+		uniform vignetterParams: vec4f;
+		
+		var<private> dVignette: f32;
+		
+		fn calcVignette(uv: vec2f) -> f32 {
+			let inner = uniform.vignetterParams.x;
+			let outer = uniform.vignetterParams.y;
+			let curvature = uniform.vignetterParams.z;
+			let intensity = uniform.vignetterParams.w;
+			let curve = pow(abs(uv * 2.0 - 1.0), vec2f(1.0 / curvature));
+			let edge = pow(length(curve), curvature);
+			dVignette = 1.0 - intensity * smoothstep(inner, outer, edge);
+			return dVignette;
+		}
+		fn applyVignette(color: vec3f, uv: vec2f) -> vec3f {
+			return color * calcVignette(uv);
+		}
+	#endif
+`;
+
+export { composeVignettePS as default };

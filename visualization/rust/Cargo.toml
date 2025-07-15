@@ -1,0 +1,18 @@
+[workspace]
+members = [
+    "spark-internal-rs",
+]
+resolver = "2"
+
+[workspace.package]
+rust-version = "1.82"
+edition = "2021"
+license = "Proprietary"
+authors = ["World Labs Technologies"]
+repository = "https://github.com/sparkjs-dev/spark"
+
+[workspace.dependencies]
+anyhow = "1.0.98"
+half = "2.6.0"
+js-sys = "0.3.77"
+wasm-bindgen = "0.2.100"
