@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>IMPROVE 2025 - Dataset extraction framework dedicated to complex Laban motion analysis</title>
+  <style>
+    /* ============================= */
+    /*  GLOBAL PAGE & TEXT STYLES   */
+    /* ============================= */
+    body {
+      background-color: #2D2D2D;
+      color: #F0F0F0;
+      margin: 0;
+      font-family: Cordana, Calibri, sans-serif;
+      overflow: auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 1em 0 0.5em;
+      font-size: 2em;
+      font-weight: bold;
+      color: #FFFFFF;
+    }
+
+    h2 {
+      font-size: 1.5em;
+      margin-bottom: 0.25em;
+      color: #EEEEEE;
+    }
+
+    h3 {
+      text-align: center;
+      font-size: 1.25em;
+      font-weight: normal;
+      margin: 0.5em 0;
+      color: #DDD;
+    }
+
+    .footnote {
+      text-align: center;
+      font-size: 0.9em;
+      font-weight: normal;
+      color: #CCC;
+    }
+
+    /* ============================= */
+    /*      DIRECTORY BLOCKS        */
+    /* ============================= */
+    .directory-block {
+      width: 90%;
+      max-width: 1200px;
+      margin: 2em auto;
+      text-align: center;
+      background-color: #3A3A3A;
+      border-radius: 6px;
+      padding: 1.5em 1em;
+    }
+
+    .directory-block h2 {
+      margin-top: 0;
+      color: #FFFFFF;
+    }
+
+    .directory-block img {
+      width: 75%;
+      display: block;
+      margin: 1em auto;
+      border: 2px solid #555;
+      border-radius: 4px;
+    }
+
+    /* ============================= */
+    /*      TABLE  STYLES           */
+    /* ============================= */
+    .directory-table {
+      width: 80%;
+      margin: 0.5em auto 1.5em;
+      border-collapse: collapse;
+      background-color: #2B2B2B;
+    }
+
+    .directory-table th,
+    .directory-table td {
+      border: 1px solid #555;
+      padding: 0.75em 1em;
+      text-align: center;
+    }
+
+    .directory-table th {
+      background-color: #444;
+      color: #FFF;
+    }
+
+    .directory-table td {
+      color: #EEE;
+    }
+
+    .directory-table td a {
+      color: Orange;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .directory-table td a:hover {
+      text-decoration: underline;
+    }
+
+    /* ============================= */
+    /*  METHODS OVERVIEW STYLES     */
+    /* ============================= */
+    .methods-info {
+      width: 90%;
+      max-width: 900px;
+      margin: 1em auto 2em;
+      border: 2px solid #555;
+      background-color: #3A3A3A;
+      border-radius: 6px;
+      padding: 1.5em;
+    }
+
+    .methods-info h2 {
+      margin-top: 0;
+      text-align: center;
+      color: #FFFFFF;
+    }
+
+    .methods-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1em;
+      background-color: #2B2B2B;
+    }
+
+    .methods-table th,
+    .methods-table td {
+      border: 1px solid #555;
+      padding: 0.75em 1em;
+      text-align: left;
+    }
+
+    .methods-table th {
+      background-color: #444;
+      color: #FFF;
+      width: 25%;
+    }
+
+    .methods-table td {
+      color: #EEE;
+    }
+
+    .methods-table a {
+      color: Orange;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .methods-table a:hover {
+      text-decoration: underline;
+    }
+
+    /* ============================= */
+    /*   IMPORTANT NOTE  BLOCK      */
+    /* ============================= */
+    .important-note-block {
+      margin-top: 1.5em;
+      background-color: #2D2D2D;  /* Couleur de fond plus visible */
+      color: Orange;             /* Texte foncé pour contraste */
+      border-radius: 6px;
+      padding: 1.2em;
+      font-size: 1.1em;           /* Police un peu plus grande */
+      line-height: 1.4;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>IMPROVE 2025 - Dataset extraction framework dedicated to complex Laban motion analysis</h1>
+
+  <script>
+    // List of directories
+    const directories = [
+      "B5-1", "B5-2", "D1-4", "D10-2", "D10-3", 
+      "D11-2", "D11-3", "D12-3", "D4-3", "D4-4", 
+      "D5-2", "D7-1", "D7-2", "D7-3", "D8-2"
+    ];
+
+    // Methods
+    const methods = ["hmr2", "tokenhmr", "multihmr", "nlf"];
+    const methodsToDisplay = ["HMR 2.0", "Token HMR", "Multi-HMR", "NLF"];
+
+    const methodsFullnames = [ 
+      "Humans in 4D: Reconstructing and Tracking Humans with Transformers", 
+      "TokenHMR: Advancing Human Mesh Recovery with a Tokenized Pose Representation",
+      "Multi-HMR: Multi-Person Whole-Body Human Mesh Recovery in a Single Shot",
+      "Neural Localizer Fields for Continuous 3D Human Pose and Shape Estimation"
+    ];
+
+    const methodsLinks = [
+      "https://shubham-goel.github.io/4dhumans/",
+      "https://github.com/saidwivedi/TokenHMR",
+      "https://github.com/naver/multi-hmr?tab=readme-ov-file",
+      "https://github.com/isarandi/nlf"
+    ];
+
+    // Insert a small overview of methods right after the main title
+    const bodyElement = document.body;
+
+    const methodsInfoContainer = document.createElement("div");
+    methodsInfoContainer.className = "methods-info";
+
+    const methodsInfoTitle = document.createElement("h2");
+    methodsInfoTitle.textContent = "3D Pose Estimation Methods";
+    methodsInfoContainer.appendChild(methodsInfoTitle);
+
+    // A table that shows short name, full name, and link
+    const methodsOverviewTable = document.createElement("table");
+    methodsOverviewTable.className = "methods-table";
+
+    // Table header
+    const overviewThead = document.createElement("thead");
+    const overviewHeaderRow = document.createElement("tr");
+    const overviewShort = document.createElement("th");
+    overviewShort.textContent = "Short Name";
+    const overviewFull = document.createElement("th");
+    overviewFull.textContent = "Full Name";
+    const overviewLink = document.createElement("th");
+    overviewLink.textContent = "GitHub / Project Link";
+
+    overviewHeaderRow.appendChild(overviewShort);
+    overviewHeaderRow.appendChild(overviewFull);
+    overviewHeaderRow.appendChild(overviewLink);
+    overviewThead.appendChild(overviewHeaderRow);
+    methodsOverviewTable.appendChild(overviewThead);
+
+    // Table body
+    const overviewTbody = document.createElement("tbody");
+    for (let i = 0; i < methods.length; i++) {
+      const row = document.createElement("tr");
+
+      const tdShort = document.createElement("td");
+      tdShort.textContent = methodsToDisplay[i];
+      row.appendChild(tdShort);
+
+      const tdFull = document.createElement("td");
+      tdFull.textContent = methodsFullnames[i];
+      row.appendChild(tdFull);
+
+      const tdLink = document.createElement("td");
+      const linkA = document.createElement("a");
+      linkA.href = methodsLinks[i];
+      linkA.target = "_blank";
+      linkA.textContent = methodsLinks[i];
+      tdLink.appendChild(linkA);
+      row.appendChild(tdLink);
+
+      overviewTbody.appendChild(row);
+    }
+
+    methodsOverviewTable.appendChild(overviewTbody);
+    methodsInfoContainer.appendChild(methodsOverviewTable);
+
+    // IMPORTANT NOTE in a separate block
+    const importantNoteBlock = document.createElement("div");
+    importantNoteBlock.className = "important-note-block";
+    importantNoteBlock.textContent = 
+      "In order to have a common reference for the display of all our 3D poses, " +
+      "we estimated the 3D keypoints and vertices of the meshes by positioning the cameras " +
+      "required for these estimations at the same coordinate (0,0,0). " +
+      "As a result, when displaying successive poses in a sequence, " +
+      "keypoint 15 (associated with the head of the displayed body) remains fixed.";
+
+    methodsInfoContainer.appendChild(importantNoteBlock);
+
+    // Insert the methods overview container after the <h1>
+    bodyElement.insertBefore(methodsInfoContainer, bodyElement.children[1]);
+
+    // Now create a block for each directory
+    directories.forEach(dir => {
+      // Container for each directory
+      const container = document.createElement("div");
+      container.className = "directory-block";
+
+      // Title for the directory
+      const title = document.createElement("h2");
+      title.textContent = `Directory: ${dir}`;
+      container.appendChild(title);
+
+      // Collage image
+      const collage = document.createElement("img");
+      collage.src = `./IMPROVE2025/${dir}/collage.jpg`;
+      collage.alt = `Collage for ${dir}`;
+      container.appendChild(collage);
+
+      // Table for the methods
+      const table = document.createElement("table");
+      table.className = "directory-table";
+
+      // Table header
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      const thMethod = document.createElement("th");
+      thMethod.textContent = "Method";
+      const thLink = document.createElement("th");
+      thLink.textContent = "Link";
+      headerRow.appendChild(thMethod);
+      headerRow.appendChild(thLink);
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      // Table body
+      const tbody = document.createElement("tbody");
+
+      for (let i = 0; i < methods.length; i++) {
+        const method = methods[i];
+        const methodDisplayed = methodsToDisplay[i];
+
+        const row = document.createElement("tr");
+
+        // Column: method displayed text
+        const tdMethod = document.createElement("td");
+        tdMethod.textContent = methodDisplayed;
+        row.appendChild(tdMethod);
+
+        // Column: link to viewerIMPROVE2025.html
+        const tdLink = document.createElement("td");
+        const link = document.createElement("a");
+        link.href = `viewerIMPROVE2025.html?base=./IMPROVE2025/${dir}/${method}-t&video=./IMPROVE2025/${dir}/video.mp4`;
+        link.target = "_blank";
+        link.textContent = "Open in a new tab";
+        tdLink.appendChild(link);
+
+        row.appendChild(tdLink);
+        tbody.appendChild(row);
+      }
+
+      table.appendChild(tbody);
+      container.appendChild(table);
+
+      // Finally, add everything to the body
+      bodyElement.appendChild(container);
+    });
+  </script>
+</body>
+</html>

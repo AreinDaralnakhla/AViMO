@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>3D Capture</title>
+    <style>
+      body {
+        margin: 0;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='gui.css') }}">
+
+    <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+    
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.167.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.167.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module" src="{{ url_for('static', filename='functions.js') }}"></script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { GUI } from "three/addons/libs/lil-gui.module.min.js";
+      import Stats from 'three/addons/libs/stats.module.js';
+      import { GPUStatsPanel } from 'three/addons/utils/GPUStatsPanel.js';
+      import { addCheckerboard, initTHREE, 
+        initSkeletonsPT, updateSkeletonsPT, 
+        fetchFramePT, fetchInfosPT } from "{{ url_for('static', filename='functions.js') }}";
+
+      let scene, camera, renderer, controls;
+      let stats, gpuPanel;
+      
+      let allSkeletonsGroup = null;
+      let skeletonsArrayWithId = [];
+      let skeletonsArrayWithoutId = [];
+
+      let gui;
+      let currentFrameGUI;
+      let totalFrameNumber = 0;
+      let type = 0;
+
+      let maxHumans = 0;
+      let notempty = 0;
+      let FPS = 30;
+      let frameDuration = 1 / FPS;
+      let smplx_faces = [];
+      let clock;
+      let isAnimating = false;
+
+      const params = {
+        currentFrame: 0,
+        currentFrameFloat: 0,
+        globalRotation: 0,
+        globalZOffset: 0.0,
+        speedMultiplier: 1,
+        displaySkeletons: true,
+      };
+
+      function nextFrame() {
+        if (params.currentFrame < (totalFrameNumber-1)) {
+          params.currentFrame += 1;
+          params.currentFrameFloat = params.currentFrame;
+          clock.elapsedTime = params.currentFrame * frameDuration;
+
+          currentFrameGUI.updateDisplay();
+
+          fetchFramePT(params.currentFrame).then((data) => {
+            updateSkeletonsPt(data, maxHumans, skeletonsArrayWithId, skeletonsArrayWithoutId);
+            currentFrameGUI.updateDisplay();
+          });
+        }
+      }
+
+      function previousFrame() {
+        if (params.currentFrame > 0) {
+          params.currentFrame -= 1;
+          params.currentFrameFloat = params.currentFrame;
+          clock.elapsedTime = params.currentFrame * frameDuration;
+
+          currentFrameGUI.updateDisplay();
+
+          fetchFramePT(params.currentFrame).then((data) => {
+            updateSkeletonsPT(data, maxHumans, skeletonsArrayWithId, skeletonsArrayWithoutId);
+            currentFrameGUI.updateDisplay();
+          });
+        }
+      }
+
+      function playPauseAnimation() {
+        if (isAnimating) {
+          isAnimating = false;
+        } else {
+          clock.elapsedTime = params.currentFrame * frameDuration;
+          isAnimating = true;
+        }
+      }
+
+      function init() {
+
+        // Initialisation de l'horloge
+        clock = new THREE.Clock();
+        clock.start();
+        // Scene, Camera, Renderer
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
+        camera.position.z = 5;
+
+
+        renderer = new THREE.WebGLRenderer({ samples: 4, antialias: true });
+        controls = new OrbitControls(camera, renderer.domElement);
+         // Définir la cible de la caméra
+ 
+        initTHREE ( renderer, scene, camera, controls );
+        controls.target.set(0, 0, 0);
+        controls.update();
+   
+        fetchInfosPT().then((data) => {
+          console.log(data);
+
+          totalFrameNumber = data["totalFrameNumber"];
+          maxHumans = data["maxHumans"];
+          notempty = data["notempty"];
+          smplx_faces = data["smplx_faces"];
+          FPS = data["video_fps"];
+          if (FPS == 0) FPS = 30;
+          frameDuration = 1 / FPS;
+
+          var frameObj = {
+            playPauseAnimation: function () {
+              playPauseAnimation();
+            },
+            stopAnimation: function () {
+              isAnimating = false;
+              clock.elapsedTime = 0;
+              params.currentFrame = 0;
+              params.currentFrameFloat = params.currentFrame;
+              fetchFramePT(params.currentFrame).then((data) => {
+                  updateSkeletonsPT(data, maxHumans, skeletonsArrayWithId, skeletonsArrayWithoutId);
+                  currentFrameGUI.updateDisplay();
+                });            
+              },
+            nextFrame: function () {
+              nextFrame();
+            },
+            previousFrame: function () {
+              previousFrame();
+            },
+          };
+
+          gui = new GUI();
+          const frameGUI = gui.addFolder("Frame"); 
+          currentFrameGUI = frameGUI
+            .add(params, "currentFrame", 0, totalFrameNumber-1, 1)
+            .name("Frame")
+            .listen()
+            .onChange(function (value) {
+              params.currentFrame = value;
+              params.currentFrameFloat = value;
+              clock.elapsedTime = params.currentFrame * frameDuration;
+              console.log(clock.elapsedTime);
+
+              fetchFramePKL(params.currentFrame).then((data) => {
+                updateSkeletonsPT(data, maxHumans, skeletonsArrayWithId, skeletonsArrayWithoutId);
+              });
+            });
+          frameGUI.add(frameObj, "playPauseAnimation").name("Play/Pause");
+          frameGUI.add(frameObj, "stopAnimation").name("Stop");          
+          frameGUI.add(frameObj, "nextFrame").name("Next Frame");
+          frameGUI.add(frameObj, "previousFrame").name("Previous Frame");
+          frameGUI.add(frameObj, 'speedMultiplier', { '1/4': .25, '1/2': .5, "x1": 1, 'x2': 2, 'x4': 4 } ).name("Speed Multiplier").setValue(1)
+            .listen()
+            .onChange(function (value) {
+              params.speedMultiplier = value;
+              console.log(params.speedMultiplier);
+            });
+          const transformGUI = gui.addFolder("Global Transform");
+          transformGUI
+            .add(params, "globalRotation", -60, 60, 0.1)
+            .name("Rotation")
+            .listen()
+            .onChange(function (value) {
+              params.globalRotation = value;
+              if (allSkeletonsGroup !== null)
+                allSkeletonsGroup.rotation.x = (params.globalRotation * Math.PI) / 180;
+            });
+          transformGUI
+            .add(params, "globalZOffset", -2, +2, 0.05)
+            .name("Z Offset")
+            .listen()
+            .onChange(function (value) {
+              params.globalZOffset = value;
+              if (allSkeletonsGroup !== null)
+                allSkeletonsGroup.position.y = params.globalZOffset;
+            });
+          const displayGUI = gui.addFolder("Display");
+          displayGUI
+          .add(params, "displaySkeletons")
+            .name("Display Skeletons")
+            .listen()
+            .onChange(function () {
+              allSkeletonsGroup.visible = params.displaySkeletons;
+            });
+
+          window.addEventListener("resize", onWindowResize, false);
+          window.addEventListener("keydown", onDocumentKeyDown, false);
+
+  				stats = new Stats();
+	  			document.body.appendChild( stats.dom );
+
+          gpuPanel = new GPUStatsPanel( renderer.getContext() );
+				  stats.addPanel( gpuPanel );
+				  stats.showPanel( 0 );
+
+          fetchFramePT(notempty).then((data) => {
+            allSkeletonsGroup = new THREE.Group();
+            initSkeletonsPT(maxHumans, allSkeletonsGroup, params, scene, 
+                          skeletonsArrayWithId, skeletonsArrayWithoutId);
+
+            const boardSize = 15;
+            const squareSize = 1;
+            addCheckerboard(scene, boardSize, squareSize,0);
+
+            fetchFramePT(params.currentFrame).then((data) => {
+              console.log(data);
+              updateSkeletonsPT(data, maxHumans, skeletonsArrayWithId, skeletonsArrayWithoutId);
+            });
+          });
+        });
+      }
+      window.addEventListener("load", (event) => {
+        console.log("The page has fully loaded");
+
+        init();
+        animate();
+      });
+
+      // Animation loop
+      function animate() {
+        requestAnimationFrame(animate);
+        if (typeof controls !== "undefined") 
+          controls.update();
+   
+        const deltaTime = clock.getDelta() * params.speedMultiplier;
+        if (isAnimating) 
+        {
+          params.currentFrameFloat += deltaTime * FPS;
+          params.currentFrame = Math.floor(params.currentFrameFloat);
+          if (params.currentFrameFloat > totalFrameNumber) {
+            params.currentFrame = 0;
+            params.currentFrameFloat = 0;
+          }
+          currentFrameGUI.updateDisplay();
+          fetchFramePT(params.currentFrame).then((data) => {
+            updateSkeletonsPT(data, maxHumans, skeletonsArrayWithId, skeletonsArrayWithoutId);
+          });
+        }
+        renderer.render(scene, camera);
+        if (typeof stats !== "undefined") 
+          stats.update();
+
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+      
+      function onDocumentKeyDown(event) {
+        var keyCode = event.which;
+        if (keyCode === 39) { // -> key
+            nextFrame();
+        } else if (keyCode === 37) { // <- key
+            previousFrame();
+        } else if (keyCode === 32) { // Space key
+            playPauseAnimation();
+        }
+      }
+    </script>
+  </body>
+</html>

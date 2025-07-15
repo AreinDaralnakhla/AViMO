@@ -1,0 +1,24 @@
+# Ignore fitting_outputs content
+/fitting/fitting_outputs/
+
+# Ignore outputs folder
+/outputs/
+
+# Ignore specific avatar folders
+/visualize/vis/avatars/splats_1_1/
+/visualize/vis/avatars/splats_1_2/
+/visualize/vis/avatars/splats_8_1/
+/visualize/vis/avatars/splats_8_2/
+/visualize/vis/avatars/splats_8_10/
+
+# Ignore data folder content
+/avatar/data/Custom/data/
+
+# Ignore package.json and package-lock.json inside visualize
+/visualize/package.json
+/visualize/package-lock.json
+/fitting/MODELS_DIR
+/avatar/output
+/avatar/tools/diff-gaussian-rasterization-depth
+/avatar/main/neutral_pose
+/avatar/common/utils/human_model_files

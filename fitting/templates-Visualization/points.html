@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Random Points</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Setup basic Three.js components
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Create a geometry to hold the points
+        const pointsGeometry = new THREE.BufferGeometry();
+        const numPoints = 1000; // Number of points
+        const positions = new Float32Array(numPoints * 3);
+
+        // Generate random positions for the points
+        for (let i = 0; i < numPoints; i++) {
+            positions[i * 3] = Math.random() * 20 - 10; // X
+            positions[i * 3 + 1] = Math.random() * 20 - 10; // Y
+            positions[i * 3 + 2] = Math.random() * 20 - 10; // Z
+        }
+
+        // Assign positions to the geometry
+        pointsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        // Create a material for the points
+        const pointsMaterial = new THREE.PointsMaterial({
+            color: 0xFFFFFF,
+            size: 0.1,
+        });
+
+        // Create the points object
+        const points = new THREE.Points(pointsGeometry, pointsMaterial);
+        scene.add(points);
+
+        // Position the camera
+        camera.position.z = 30;
+
+        // Render loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

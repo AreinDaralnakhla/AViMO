@@ -1,0 +1,4 @@
+python .\convertCapture3D.py .\templates-Visualization\IMPROVE2025\B5-1\nlf-t.pkl .\templates-Visualization\IMPROVE2025\B5-1\nlf-t 0 0 1 1 1 0 neutral .\camera_settings.json 1
+python .\convertCapture3D.py .\templates-Visualization\IMPROVE2025\B5-1\hmr2-t.pkl .\templates-Visualization\IMPROVE2025\B5-1\hmr2-t 0 0 1 1 1 0 neutral .\camera_settings.json 1
+python .\convertCapture3D.py .\templates-Visualization\IMPROVE2025\B5-1\multihmr-t.pkl .\templates-Visualization\IMPROVE2025\B5-1\multihmr-t 0 0 1 1 1 0 neutral .\camera_settings.json 1
+python .\convertCapture3D.py .\templates-Visualization\IMPROVE2025\B5-1\tokenhmr-t.pkl .\templates-Visualization\IMPROVE2025\B5-1\tokenhmr-t 0 0 1 1 1 0 neutral .\camera_settings.json 1

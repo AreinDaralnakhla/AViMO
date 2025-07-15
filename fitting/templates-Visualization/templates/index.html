@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Pkl Visualization</title>
+    <style>
+      body {
+        margin: 0;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='gui.css') }}">
+
+    <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+    
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.167.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.167.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module" src="{{ url_for('static', filename='functions.js') }}"></script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { GUI } from "three/addons/libs/lil-gui.module.min.js";
+      import Stats from 'three/addons/libs/stats.module.js';
+      import { GPUStatsPanel } from 'three/addons/utils/GPUStatsPanel.js';
+      import {
+        connections,
+        connectionsColors,
+        checkerboardGroup,
+        idColors,
+        addCheckerboard,
+        addAllTracks, 
+        initTHREE, 
+        generateTrackList,
+        initSkeletons, 
+        updateSkeletons, 
+        updateSkeletonsPKL, 
+        initBodies, 
+        updateBodies, 
+        updateBodiesPKL,  
+        fetchFramePKL, 
+        fetchVerticesPKL, 
+        fetchInfosPKL 
+      } from "{{ url_for('static', filename='functions.js') }}";
+
+      let scene, camera, renderer, controls;
+      let stats, gpuPanel;
+      
+      let allBodiesGroup = null;
+      let bodiesArrayWithId = [];
+      let bodiesArrayWithoutId = [];
+
+      let allSkeletonsGroup = null;
+      let skeletonsArrayWithId = [];
+      let skeletonsArrayWithoutId = [];
+
+      // FIX: Declare allTracksGroup as a THREE.Group (not as an array)
+      let allTracksGroup = null;
+
+      let gui;
+      let controlTracksGUI;
+      let currentFrameGUI;
+      let totalFrameNumber = 0;
+      let type = 0;
+
+      let maxHumans = 0;
+      let notempty = 0;
+      let keypointsNumber = 127;
+      let FPS = 30;
+      let fileName = "No file loaded";
+      let frameDuration = 1 / FPS;
+      let smplx_faces = [];
+      let clock;
+      let isAnimating = false;
+      let counter = 0;
+
+      const params = {
+        currentFrame: 0,
+        currentFrameFloat: 0,
+        globalRotation: 0,
+        globalZOffset: 0.5,
+        speedMultiplier: 1,
+        displaySkeletons: true,
+        displayTracks: true,
+        displayCheckerboard: true,
+      };
+
+      let cameraParams = {
+        targetX: 0,
+        targetY: 0,
+        targetZ: 0,
+        distance: 0,
+        polarAngle: 0,
+        azimuthAngle: 0,
+      };
+
+      function nextFrame() {
+        if (params.currentFrame < (totalFrameNumber-1)) {
+          params.currentFrame += 1;
+          params.currentFrameFloat = params.currentFrame;
+          clock.elapsedTime = params.currentFrame * frameDuration;
+
+          currentFrameGUI.updateDisplay();
+
+          fetchFramePKL(params.currentFrame).then((data) => {
+            updateSkeletonsPKL(
+              data,
+              maxHumans,
+              skeletonsArrayWithId,
+              skeletonsArrayWithoutId,
+              keypointsNumber
+            );
+            currentFrameGUI.updateDisplay();
+          });
+        }
+      }
+
+      function previousFrame() {
+        if (params.currentFrame > 0) {
+          params.currentFrame -= 1;
+          params.currentFrameFloat = params.currentFrame;
+          clock.elapsedTime = params.currentFrame * frameDuration;
+
+          currentFrameGUI.updateDisplay();
+
+          fetchFramePKL(params.currentFrame).then((data) => {
+            updateSkeletonsPKL(
+              data,
+              maxHumans,
+              skeletonsArrayWithId,
+              skeletonsArrayWithoutId,
+              keypointsNumber
+            );
+            currentFrameGUI.updateDisplay();
+          });
+        }
+      }
+
+      function playPauseAnimation() {
+        if (isAnimating) {
+          isAnimating = false;
+        } else {
+          clock.elapsedTime = params.currentFrame * frameDuration;
+          isAnimating = true;
+        }
+      }
+
+      function addTrackToggles() {
+        allTracksGroup.children.forEach((track, index) => {
+          const poseId = track.userData.poseId;
+          const key = (poseId !== undefined) ? poseId : index;
+          const trackObj = { visible: window.trackVisibility[key] ?? track.visible };
+              
+          // Store the controller in a variable
+          const controller = controlTracksGUI.add(trackObj, "visible")
+            .name("Pose " + key)
+            .onChange((value) => {
+              track.visible = value;
+              window.trackVisibility[key] = value;
+              
+              // Add after setting window.trackVisibility[key] = value;
+              fetchFramePKL(params.currentFrame).then((data) => {
+                updateSkeletonsPKL(
+                  data,
+                  maxHumans,
+                  skeletonsArrayWithId,
+                  skeletonsArrayWithoutId,
+                  keypointsNumber
+                );
+              });
+
+            });
+          
+          // Safely access the domElement
+          if (controller && controller.domElement) {
+            const colorHex = '#' + idColors[(key+1) % idColors.length].toString(16).padStart(6, '0');
+            controller.domElement.style.color = colorHex;
+          }
+        });
+      }
+
+      function init() {
+
+        // Initialize clock
+        clock = new THREE.Clock();
+        clock.start();
+
+        // Scene, Camera, Renderer
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
+        renderer = new THREE.WebGLRenderer({ samples: 4, antialias: true });
+        controls = new OrbitControls(camera, renderer.domElement);
+
+        // Basic setup (lights, etc.)
+        initTHREE(renderer, scene, camera, controls);
+
+        fetchInfosPKL().then((data) => {
+          totalFrameNumber = data["totalFrameNumber"];
+          maxHumans = data["maxHumans"];
+          notempty = data["notempty"];
+          keypointsNumber = data["nbKeyPoints"];
+          console.log("keypointsNumber: ", keypointsNumber);
+          smplx_faces = data["smplx_faces"];
+          FPS = data["video_fps"];
+          fileName = data["fileName"];
+          params.globalRotation = data["floor_angle_deg"];
+          params.globalZOffset = -1 - data["floor_Zoffset"];
+          document.title = "Visualization: " + fileName;
+          if (FPS === 0) FPS = 30;
+          frameDuration = 1 / FPS;
+
+          const frameObj = {
+            computeMeshes: function() {
+              fetchVerticesPKL(params.currentFrame).then((data) => {
+                allBodiesGroup.visible = true;
+                updateBodiesPKL(
+                  data,
+                  maxHumans,
+                  bodiesArrayWithId,
+                  bodiesArrayWithoutId
+                );
+                updateSkeletonsPKL(
+                  data,
+                  maxHumans,
+                  skeletonsArrayWithId,
+                  skeletonsArrayWithoutId,
+                  keypointsNumber
+                );
+              });
+            },
+            removeMeshes: function() {
+              allBodiesGroup.visible = false;
+            },
+            playPauseAnimation: function () {
+              playPauseAnimation();
+            },
+            stopAnimation: function () {
+              isAnimating = false;
+              clock.elapsedTime = 0;
+              params.currentFrame = 0;
+              params.currentFrameFloat = params.currentFrame;
+              fetchFramePKL(params.currentFrame).then((data) => {
+                updateSkeletonsPKL(
+                  data,
+                  maxHumans,
+                  skeletonsArrayWithId,
+                  skeletonsArrayWithoutId,
+                  keypointsNumber
+                );
+                currentFrameGUI.updateDisplay();
+              });
+            },
+            nextFrame: function () {
+              nextFrame();
+            },
+            previousFrame: function () {
+              previousFrame();
+            },
+            takeScreenshot: function () {
+              renderer.render(scene, camera);
+              const dataURL = renderer.domElement.toDataURL("image/png");
+              const a = document.createElement("a");
+              a.href = dataURL;
+              a.download = `pose3d-${String(counter).padStart(3, '0')}.png`;
+              a.click(); 
+              counter += 1;
+            },
+            resetCounter: function () {
+              counter = 0;
+            },
+            loadCamera: function () {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.json';
+
+              input.onchange = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  try {
+                    const data = JSON.parse(e.target.result);
+                    cameraParams.targetX = data.targetX ?? cameraParams.targetX;
+                    cameraParams.targetY = data.targetY ?? cameraParams.targetY;
+                    cameraParams.targetZ = data.targetZ ?? cameraParams.targetZ;
+                    cameraParams.distance = data.distance ?? cameraParams.distance;
+                    cameraParams.polarAngle = data.polarAngle ?? cameraParams.polarAngle;
+                    cameraParams.azimuthAngle = data.azimuthAngle ?? cameraParams.azimuthAngle;
+
+                    controls.target.set(
+                      cameraParams.targetX,
+                      cameraParams.targetY,
+                      cameraParams.targetZ
+                    );
+                    const polarAngleRad = THREE.MathUtils.degToRad(cameraParams.polarAngle);
+                    const azimuthAngleRad = THREE.MathUtils.degToRad(cameraParams.azimuthAngle);
+                    setOrbitAngles(polarAngleRad, azimuthAngleRad);
+                    controls.update();
+                    console.log("Camera settings loaded successfully.");
+                  } catch (error) {
+                    console.error("Error while loading the camera file:", error);
+                  }
+                };
+                reader.readAsText(file);
+              };
+
+              input.click();
+            },
+
+            saveCamera: function () {
+              const dataToSave = {
+                targetX: cameraParams.targetX,
+                targetY: cameraParams.targetY,
+                targetZ: cameraParams.targetZ,
+                distance: cameraParams.distance,
+                polarAngle: cameraParams.polarAngle,
+                azimuthAngle: cameraParams.azimuthAngle
+              };
+
+              const jsonString = JSON.stringify(dataToSave, null, 2);
+              const blob = new Blob([jsonString], { type: 'application/json' });
+
+              const link = document.createElement('a');
+              link.href = URL.createObjectURL(blob);
+              link.download = 'camera_settings.json';
+              link.style.display = 'none';
+
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+
+              console.log("Camera settings saved successfully.");
+            }
+          };
+
+          // --- Main GUI ---
+          gui = new GUI();
+
+          // --- Frame GUI ---
+          const frameGUI = gui.addFolder("Frame"); 
+          currentFrameGUI = frameGUI
+            .add(params, "currentFrame", 0, totalFrameNumber - 1, 1)
+            .name("Frame")
+            .listen()
+            .onChange(function(value) {
+              params.currentFrame = value;
+              params.currentFrameFloat = value;
+              clock.elapsedTime = params.currentFrame * frameDuration;
+              fetchFramePKL(params.currentFrame).then((data) => {
+                updateSkeletonsPKL(
+                  data,
+                  maxHumans,
+                  skeletonsArrayWithId,
+                  skeletonsArrayWithoutId,
+                  keypointsNumber
+                );
+              });
+            });
+          frameGUI.add(frameObj, "playPauseAnimation").name("Play/Pause");
+          frameGUI.add(frameObj, "stopAnimation").name("Stop");          
+          frameGUI.add(frameObj, "nextFrame").name("Next Frame");
+          frameGUI.add(frameObj, "previousFrame").name("Previous Frame");
+          frameGUI
+            .add(frameObj, "speedMultiplier", { "1/4": 0.25, "1/2": 0.5, "x1": 1, "x2": 2, "x4": 4 })
+            .name("Speed Multiplier")
+            .setValue(1)
+            .listen()
+            .onChange(function(value) {
+              params.speedMultiplier = value;
+              console.log(params.speedMultiplier);
+            });
+                    
+          // --- Meshes GUI ---
+          const meshesGUI = gui.addFolder("Meshes");
+          meshesGUI.add(frameObj, "computeMeshes").name("Compute Meshes");
+          meshesGUI.add(frameObj, "removeMeshes").name("Remove Meshes");
+
+          // --- Global Transform GUI ---
+          const transformGUI = gui.addFolder("Global Transform");
+          transformGUI
+            .add(params, "globalRotation", -180, 180, 0.1)
+            .name("Rotation")
+            .listen()
+            .onChange(function(value) {
+              params.globalRotation = value;
+              if (allBodiesGroup !== null)
+                allBodiesGroup.rotation.x = Math.PI - (params.globalRotation * Math.PI) / 180;
+              if (allSkeletonsGroup !== null)
+                allSkeletonsGroup.rotation.x = Math.PI - (params.globalRotation * Math.PI) / 180;
+              if (allTracksGroup !== null)
+                allTracksGroup.rotation.x = Math.PI - (params.globalRotation * Math.PI) / 180;
+            });
+          transformGUI
+            .add(params, "globalZOffset", -4, 4, 0.01)
+            .name("Z Offset")
+            .listen()
+            .onChange(function(value) {
+              params.globalZOffset = value;
+              if (allBodiesGroup !== null)
+                allBodiesGroup.position.y = params.globalZOffset;
+              if (allSkeletonsGroup !== null)
+                allSkeletonsGroup.position.y = params.globalZOffset;
+              if (allTracksGroup !== null)
+                allTracksGroup.position.y = params.globalZOffset;
+            });
+
+          // --- Display GUI ---
+          const displayGUI = gui.addFolder("Display");
+          displayGUI
+            .add(params, "displaySkeletons")
+            .name("Display Skeletons")
+            .listen()
+            .onChange(function() {
+              allSkeletonsGroup.visible = params.displaySkeletons;
+            });
+          displayGUI
+            .add(params, "displayTracks")
+            .name("Display Tracks")
+            .listen()
+            .onChange(function() {
+              allTracksGroup.visible = params.displayTracks;
+            });
+          displayGUI
+            .add(params, "displayCheckerboard")
+            .name("Display Checkerboard")
+            .listen()
+            .onChange(function() {
+              checkerboardGroup.visible = params.displayCheckerboard;
+            });
+
+          // --- Initialize camera fields ---
+          cameraParams = {
+            targetX: controls.target.x,
+            targetY: controls.target.y,
+            targetZ: controls.target.z,
+            distance: controls.getDistance(),
+            polarAngle: THREE.MathUtils.radToDeg(controls.getPolarAngle()),
+            azimuthAngle: THREE.MathUtils.radToDeg(controls.getAzimuthalAngle()),
+          };
+
+          // --- Camera GUI ---
+          const cameraGUI = gui.addFolder("Camera Properties");
+          controls.minAzimuthAngle = -Math.PI;
+          controls.maxAzimuthAngle =  Math.PI;
+          controls.minPolarAngle   = -Math.PI;
+          controls.maxPolarAngle   =  Math.PI;
+
+          cameraGUI
+            .add(cameraParams, "targetX", -10, 10, 0.1)
+            .name("Target X")
+            .listen()
+            .onChange((val) => {
+              controls.target.x = val;
+              controls.update();
+            });
+          cameraGUI
+            .add(cameraParams, "targetY", -10, 10, 0.1)
+            .name("Target Y")
+            .listen()
+            .onChange((val) => {
+              controls.target.y = val;
+              controls.update();
+            });
+          cameraGUI
+            .add(cameraParams, "targetZ", -10, 10, 0.1)
+            .name("Target Z")
+            .listen()
+            .onChange((val) => {
+              controls.target.z = val;
+              controls.update();
+            });
+          cameraGUI
+            .add(cameraParams, "distance", 0.1, 50, 0.1)
+            .name("Distance")
+            .listen()
+            .onChange((val) => {
+              const center = controls.target.clone();
+              const oldPos = controls.object.position.clone();
+              const direction = oldPos.sub(center).normalize();
+              const newPos = center.addScaledVector(direction, val);
+              controls.object.position.copy(newPos);
+              controls.update();
+            });
+          cameraGUI
+            .add(cameraParams, "polarAngle", 0, 180, 1)
+            .name("Polar (°)")
+            .listen()
+            .onChange((val) => {
+              const polarRad = THREE.MathUtils.degToRad(val);
+              const azimuthRad = THREE.MathUtils.degToRad(cameraParams.azimuthAngle);
+              setOrbitAngles(polarRad, azimuthRad);
+              controls.update();
+            });
+          cameraGUI
+            .add(cameraParams, "azimuthAngle", -180, 180, 1)
+            .name("Azimuth (°)")
+            .listen()
+            .onChange((val) => {
+              const azimuthRad = THREE.MathUtils.degToRad(val);
+              const polarRad = THREE.MathUtils.degToRad(cameraParams.polarAngle);
+              setOrbitAngles(polarRad, azimuthRad);
+              controls.update();
+            });
+          cameraGUI.add(frameObj, "loadCamera").name("Load Camera JSON File");
+          cameraGUI.add(frameObj, "saveCamera").name("Save Camera JSON File");
+          cameraGUI.open();
+
+          // --- Screenshot GUI ---
+          const screenshotGUI = gui.addFolder("Screenshot");
+          screenshotGUI.add(frameObj, "takeScreenshot").name("Take Screenshot");
+          screenshotGUI.add(frameObj, "resetCounter").name("Reset Screenshot Counter");
+
+          if (data["allTracks"].length > 0)
+          {
+            // --- New separate Control Tracks GUI ---
+            controlTracksGUI = new GUI({ autoPlace: false });
+            controlTracksGUI.domElement.style.position = "fixed";
+            controlTracksGUI.domElement.style.left = "-10px";
+            controlTracksGUI.domElement.style.top = "0px";
+            document.body.appendChild(controlTracksGUI.domElement);
+          } 
+          // --- OrbitControls listener ---
+          controls.addEventListener("change", updateSliders);
+          function updateSliders() {
+            const pos = controls.object.position.clone().sub(controls.target);
+            const spherical = new THREE.Spherical().setFromVector3(pos);
+            cameraParams.polarAngle   = THREE.MathUtils.radToDeg(spherical.phi);
+            cameraParams.azimuthAngle = THREE.MathUtils.radToDeg(spherical.theta);
+            cameraParams.targetX = controls.target.x;
+            cameraParams.targetY = controls.target.y;
+            cameraParams.targetZ = controls.target.z;
+            cameraParams.distance = controls.getDistance();
+          }
+          function setOrbitAngles(polar, azimuth) {
+            const center = controls.target;
+            const distance = controls.object.position.distanceTo(center);
+            const newPos = new THREE.Vector3().setFromSphericalCoords(distance, polar, azimuth);
+            controls.object.position.copy(center).add(newPos);
+          }
+          window.addEventListener("resize", onWindowResize, false);
+          window.addEventListener("keydown", onDocumentKeyDown, false);
+
+          // --- Tracks ---
+          allTracksGroup = new THREE.Group();
+          console.log("data[\"allTracks\"].length: ", data["allTracks"].length);
+          if (data["allTracks"].length > 0)
+          {
+            addAllTracks(data["allTracks"], 0, allTracksGroup, params, scene);
+            scene.add(allTracksGroup);
+            window.trackVisibility = {};
+            allTracksGroup.children.forEach((track, index) => {
+              const poseId = track.userData.poseId;
+              const key = (poseId !== undefined) ? poseId : index;
+              window.trackVisibility[key] = true;
+            });
+            console.log("addTrackToggles");
+            addTrackToggles();
+          }
+
+          // --- Load first non-empty frame ---
+          fetchFramePKL(notempty).then((data) => {
+            allSkeletonsGroup = new THREE.Group();
+            initSkeletons(maxHumans, allSkeletonsGroup, params, scene,
+                          skeletonsArrayWithId, skeletonsArrayWithoutId, keypointsNumber);
+            allBodiesGroup = new THREE.Group();
+            initBodies(maxHumans, allBodiesGroup, params, scene,
+                       bodiesArrayWithId, bodiesArrayWithoutId, smplx_faces);
+            const boardSize = 15;
+            const squareSize = 1;
+            addCheckerboard(scene, boardSize, squareSize);
+            fetchFramePKL(params.currentFrame).then((data) => {
+              updateSkeletonsPKL(
+                data,
+                maxHumans,
+                skeletonsArrayWithId,
+                skeletonsArrayWithoutId,
+                keypointsNumber
+              );
+            });
+          });
+        });
+      }
+
+      window.addEventListener("load", () => {
+        console.log("The page has fully loaded");
+        init();
+        animate();
+      });
+
+      function animate() {
+        requestAnimationFrame(animate);
+        if (typeof controls !== "undefined") {
+          controls.update();
+        }
+        const deltaTime = clock.getDelta() * params.speedMultiplier;
+        if (isAnimating) {
+          params.currentFrameFloat += deltaTime * FPS;
+          params.currentFrame = Math.floor(params.currentFrameFloat);
+          if (params.currentFrameFloat > totalFrameNumber) {
+            params.currentFrame = 0;
+            params.currentFrameFloat = 0;
+          }
+          currentFrameGUI.updateDisplay();
+          fetchFramePKL(params.currentFrame).then((data) => {
+            updateSkeletonsPKL(
+              data,
+              maxHumans,
+              skeletonsArrayWithId,
+              skeletonsArrayWithoutId,
+              keypointsNumber
+            );
+          });
+        }
+        renderer.render(scene, camera);
+        if (typeof stats !== "undefined") {
+          stats.update();
+        }
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+      
+      function onDocumentKeyDown(event) {
+        var keyCode = event.which;
+        if (keyCode === 39) { // Right arrow
+          nextFrame();
+        } else if (keyCode === 37) { // Left arrow
+          previousFrame();
+        } else if (keyCode === 32) { // Space key
+          playPauseAnimation();
+        }
+      }
+    </script>
+  </body>
+</html>

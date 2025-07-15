@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benchmark de lecture de fichier binaire</title>
+</head>
+<body>
+    <h1>Benchmark de lecture d'un fichier binaire</h1>
+    
+    <label for="blockSize">Taille du bloc à lire (en octets) :</label>
+    <input type="number" id="blockSize" value="252924" min="1">
+    
+    <button id="startButton">Démarrer le benchmark</button>
+    <pre id="output"></pre>
+
+    <script>
+        async function getFileSize(url) {
+            const response = await fetch(url, { method: 'HEAD' });
+
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP : ${response.status}`);
+            }
+
+            const contentLength = response.headers.get('Content-Length');
+            if (!contentLength) {
+                throw new Error('Impossible de déterminer la taille du fichier.');
+            }
+
+            return parseInt(contentLength, 10);
+        }
+
+        async function fetchRange(url, start, end) {
+            const response = await fetch(url, {
+                headers: {
+                    'Range': `bytes=${start}-${end}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP : ${response.status}`);
+            }
+
+            const arrayBuffer = await response.arrayBuffer();
+            return new Float32Array(arrayBuffer);
+        }
+
+        document.getElementById('startButton').addEventListener('click', async () => {
+            const url = 'test3.bin'; // URL du fichier binaire connu
+            const blockSize = parseInt(document.getElementById('blockSize').value, 10);
+            const output = document.getElementById('output');
+            
+            try {
+                // Déterminer automatiquement la taille du fichier
+                const fileSize = await getFileSize(url);
+                output.textContent = `Taille du fichier détectée : ${fileSize} octets\n`;
+
+                count = fileSize/blockSize;
+                output.textContent += `Nombre de blocs : ${count}\n`;
+                let totalDuration = 0;
+
+                for (let i = 0; i < count; i++) {
+//                    const start = i * blockSize;
+                    const start = Math.floor(Math.random() * count) * blockSize;
+                    const end = start + blockSize - 1;
+
+                    const startTime = performance.now();
+                    await fetchRange(url, start, end);
+                    const endTime = performance.now();
+
+                    totalDuration += (endTime - startTime);
+                }
+
+                const averageDuration = totalDuration / count;
+
+                output.textContent += `\nBenchmark terminé sur ${count} itérations.\n`;
+                output.textContent += `Durée totale : ${totalDuration.toFixed(2)} ms\n`;
+                output.textContent += `Durée moyenne par lecture : ${averageDuration.toFixed(2)} ms\n`;
+
+            } catch (error) {
+                output.textContent = `Erreur lors du benchmark: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
