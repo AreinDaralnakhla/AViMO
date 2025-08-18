@@ -187,8 +187,8 @@
     const totalFrames = 100; // Change to match your file count
 
     async function loadSplatFrame(index) {
-      // const path = `./splats/raw_${index.toString().padStart(4, "0")}.ply`;
-      const path = `./splats_8_2/splat_${index.toString().padStart("0")}.ply`;
+      // const path = `./splats_8_2/splat_${index.toString().padStart("0")}.spz`;
+      const path = 'your avatars path'
 
       const mesh = new SplatMesh({ url: path });
       await mesh.initialized;
